@@ -1,0 +1,26 @@
+[phases.setup]
+nixPkgs = [
+  "chromium",
+  "nss",
+  "nspr",
+  "atk",
+  "cups",
+  "dbus",
+  "expat",
+  "libdrm",
+  "libxcb",
+  "libxkbcommon",
+  "mesa",
+  "pango",
+  "cairo",
+  "alsa-lib",
+  "at-spi2-atk",
+  "at-spi2-core",
+  "xorg.libX11",
+  "xorg.libXcomposite",
+  "xorg.libXdamage",
+  "xorg.libXext",
+  "xorg.libXfixes",
+  "xorg.libXrandr",
+  "xorg.libxcb"
+]

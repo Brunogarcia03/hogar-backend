@@ -29,7 +29,12 @@ const client = new Client({
   authStrategy: new LocalAuth(),
   puppeteer: {
     headless: true,
-    args: ["--no-sandbox", "--disable-setuid-sandbox"],
+    executablePath: process.env.CHROMIUM_PATH || "/usr/bin/chromium",
+    args: [
+      "--no-sandbox",
+      "--disable-setuid-sandbox",
+      "--disable-dev-shm-usage",
+    ],
   },
 });
 
@@ -117,6 +122,8 @@ app.get("/api/status", (req, res) => {
 // ─── CONTACTOS ────────────────────────────────────────────────────────────────
 app.get("/api/contactos", (req, res) => {
   res.json(leer(CONTACTOS_FILE));
+
+  console.log(CONTACTOS_FILE);
 });
 
 app.post("/api/contactos", (req, res) => {
