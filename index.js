@@ -5,6 +5,7 @@ const path = require("path");
 const { Client, LocalAuth } = require("whatsapp-web.js");
 const qrcode = require("qrcode-terminal");
 const cron = require("node-cron");
+const QRCode = require("qrcode");
 
 const app = express();
 app.use(cors());
@@ -129,8 +130,12 @@ cron.schedule("0 10 1 * *", () => {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 // Estado del bot
-app.get("/api/status", (req, res) => {
-  res.json({ status: botStatus, qr: qrActual });
+app.get("/api/status", async (req, res) => {
+  let qrImagen = null;
+  if (qrActual) {
+    qrImagen = await QRCode.toDataURL(qrActual);
+  }
+  res.json({ status: botStatus, qr: qrImagen });
 });
 
 // ─── CONTACTOS ────────────────────────────────────────────────────────────────
