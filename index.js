@@ -4,8 +4,8 @@ const fs = require("fs");
 const path = require("path");
 const { Client, LocalAuth } = require("whatsapp-web.js");
 const qrcode = require("qrcode-terminal");
-const cron = require("node-cron");
 const QRCode = require("qrcode");
+const cron = require("node-cron");
 
 const app = express();
 app.use(cors());
@@ -22,56 +22,83 @@ const escribir = (file, data) =>
   fs.writeFileSync(file, JSON.stringify(data, null, 2));
 
 // ─── ESTADO DEL BOT ───────────────────────────────────────────────────────────
-let botStatus = "desconectado"; // desconectado | esperando_qr | listo
+let botStatus = "desconectado";
 let qrActual = null;
+let client = null;
 
-// ─── CLIENTE WHATSAPP ─────────────────────────────────────────────────────────
-const client = new Client({
-  authStrategy: new LocalAuth(),
-  puppeteer: {
-    headless: true,
-    executablePath:
-      process.env.PUPPETEER_EXECUTABLE_PATH || "/usr/bin/google-chrome-stable",
-    args: [
-      "--no-sandbox",
-      "--disable-setuid-sandbox",
-      "--disable-dev-shm-usage",
-      "--disable-gpu",
-    ],
-  },
-});
+// ─── CREAR CLIENTE ────────────────────────────────────────────────────────────
+function crearCliente() {
+  const c = new Client({
+    authStrategy: new LocalAuth(),
+    puppeteer: {
+      headless: true,
+      executablePath:
+        process.env.PUPPETEER_EXECUTABLE_PATH ||
+        "/usr/bin/google-chrome-stable",
+      args: [
+        "--no-sandbox",
+        "--disable-setuid-sandbox",
+        "--disable-dev-shm-usage",
+        "--disable-gpu",
+      ],
+    },
+  });
 
-client.on("qr", (qr) => {
-  console.log("QR generado");
-  qrcode.generate(qr, { small: true });
-  qrActual = qr;
-  botStatus = "esperando_qr";
-});
+  c.on("qr", async (qr) => {
+    console.log("QR generado");
+    qrcode.generate(qr, { small: true });
+    qrActual = qr;
+    botStatus = "esperando_qr";
+  });
 
-client.on("ready", () => {
-  console.log("WhatsApp listo 🚀");
-  botStatus = "listo";
-  qrActual = null;
-});
+  c.on("ready", () => {
+    console.log("WhatsApp listo 🚀");
+    botStatus = "listo";
+    qrActual = null;
+  });
 
-client.on("disconnected", () => {
-  console.log("WhatsApp desconectado");
+  c.on("disconnected", (reason) => {
+    console.log("WhatsApp desconectado:", reason);
+    botStatus = "desconectado";
+    qrActual = null;
+    // Reiniciar después de 5 segundos
+    console.log("Reiniciando en 5 segundos...");
+    setTimeout(() => {
+      try {
+        client = crearCliente();
+        client
+          .initialize()
+          .catch((err) => console.error("Error al reiniciar:", err.message));
+      } catch (err) {
+        console.error("Error al crear cliente:", err.message);
+      }
+    }, 5000);
+  });
+
+  // Atrapar errores no capturados del cliente
+  c.on("auth_failure", (msg) => {
+    console.error("Error de autenticación:", msg);
+    botStatus = "desconectado";
+  });
+
+  return c;
+}
+
+// Atrapar crashes globales para que el proceso no muera
+process.on("uncaughtException", (err) => {
+  console.error("Error no capturado:", err.message);
   botStatus = "desconectado";
 });
 
-const { execSync } = require("child_process");
-try {
-  const path = execSync(
-    "which chromium || which chromium-browser || find /nix -name chromium -type f 2>/dev/null | head -1",
-  )
-    .toString()
-    .trim();
-  console.log("Chromium encontrado en:", path);
-} catch (e) {
-  console.log("No se encontró chromium:", e.message);
-}
+process.on("unhandledRejection", (reason) => {
+  console.error("Promesa rechazada:", reason?.message || reason);
+});
 
-client.initialize();
+// Inicializar
+client = crearCliente();
+client
+  .initialize()
+  .catch((err) => console.error("Error al inicializar:", err.message));
 
 // ─── FUNCIÓN DE ENVÍO ─────────────────────────────────────────────────────────
 const enviarMensajes = async () => {
@@ -114,7 +141,6 @@ const enviarMensajes = async () => {
   }
 
   historial.unshift(resultado);
-  // Guardar solo los últimos 100 registros
   escribir(HISTORIAL_FILE, historial.slice(0, 100));
   console.log("Envío completado");
 };
@@ -129,11 +155,12 @@ cron.schedule("0 10 1 * *", () => {
 // API ROUTES
 // ═══════════════════════════════════════════════════════════════════════════════
 
-// Estado del bot
 app.get("/api/status", async (req, res) => {
   let qrImagen = null;
   if (qrActual) {
-    qrImagen = await QRCode.toDataURL(qrActual);
+    try {
+      qrImagen = await QRCode.toDataURL(qrActual);
+    } catch {}
   }
   res.json({ status: botStatus, qr: qrImagen });
 });
@@ -141,15 +168,12 @@ app.get("/api/status", async (req, res) => {
 // ─── CONTACTOS ────────────────────────────────────────────────────────────────
 app.get("/api/contactos", (req, res) => {
   res.json(leer(CONTACTOS_FILE));
-
-  console.log(CONTACTOS_FILE);
 });
 
 app.post("/api/contactos", (req, res) => {
   const { nombre, numero } = req.body;
   if (!nombre || !numero)
     return res.status(400).json({ error: "Nombre y número requeridos" });
-
   const contactos = leer(CONTACTOS_FILE);
   const nuevo = { id: Date.now(), nombre, numero: numero.replace(/\D/g, "") };
   contactos.push(nuevo);
@@ -189,7 +213,6 @@ app.post("/api/enviar", async (req, res) => {
       .json({ error: "El bot no está conectado a WhatsApp" });
   }
   res.json({ ok: true, mensaje: "Envío iniciado" });
-  // Enviar en background
   enviarMensajes();
 });
 
