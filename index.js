@@ -17,7 +17,8 @@ const MENSAJE_FILE = path.join(DATA_DIR, "mensaje.json");
 const HISTORIAL_FILE = path.join(DATA_DIR, "historial.json");
 
 const leer = (file) => JSON.parse(fs.readFileSync(file, "utf8"));
-const escribir = (file, data) => fs.writeFileSync(file, JSON.stringify(data, null, 2));
+const escribir = (file, data) =>
+  fs.writeFileSync(file, JSON.stringify(data, null, 2));
 
 // ─── ESTADO DEL BOT ───────────────────────────────────────────────────────────
 let botStatus = "desconectado"; // desconectado | esperando_qr | listo
@@ -77,11 +78,18 @@ const enviarMensajes = async () => {
       const numero = `${contacto.numero}@c.us`;
       await client.sendMessage(numero, mensaje);
       console.log(`✅ Enviado a ${contacto.nombre}`);
-      resultado.enviados.push({ nombre: contacto.nombre, numero: contacto.numero });
+      resultado.enviados.push({
+        nombre: contacto.nombre,
+        numero: contacto.numero,
+      });
       await new Promise((res) => setTimeout(res, 20000));
     } catch (err) {
       console.error(`❌ Error con ${contacto.nombre}:`, err.message);
-      resultado.fallidos.push({ nombre: contacto.nombre, numero: contacto.numero, error: err.message });
+      resultado.fallidos.push({
+        nombre: contacto.nombre,
+        numero: contacto.numero,
+        error: err.message,
+      });
     }
   }
 
@@ -91,8 +99,8 @@ const enviarMensajes = async () => {
   console.log("Envío completado");
 };
 
-// ─── CRON (día 27 a las 10:00) ────────────────────────────────────────────────
-cron.schedule("0 10 27 * *", () => {
+// ─── CRON (día 1 a las 10:00) ────────────────────────────────────────────────
+cron.schedule("0 10 1 * *", () => {
   console.log("Cron disparado");
   enviarMensajes();
 });
@@ -113,7 +121,8 @@ app.get("/api/contactos", (req, res) => {
 
 app.post("/api/contactos", (req, res) => {
   const { nombre, numero } = req.body;
-  if (!nombre || !numero) return res.status(400).json({ error: "Nombre y número requeridos" });
+  if (!nombre || !numero)
+    return res.status(400).json({ error: "Nombre y número requeridos" });
 
   const contactos = leer(CONTACTOS_FILE);
   const nuevo = { id: Date.now(), nombre, numero: numero.replace(/\D/g, "") };
@@ -149,7 +158,9 @@ app.get("/api/historial", (req, res) => {
 // ─── ENVÍO MANUAL ─────────────────────────────────────────────────────────────
 app.post("/api/enviar", async (req, res) => {
   if (botStatus !== "listo") {
-    return res.status(400).json({ error: "El bot no está conectado a WhatsApp" });
+    return res
+      .status(400)
+      .json({ error: "El bot no está conectado a WhatsApp" });
   }
   res.json({ ok: true, mensaje: "Envío iniciado" });
   // Enviar en background
