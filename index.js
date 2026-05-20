@@ -56,6 +56,18 @@ client.on("disconnected", () => {
   botStatus = "desconectado";
 });
 
+const { execSync } = require("child_process");
+try {
+  const path = execSync(
+    "which chromium || which chromium-browser || find /nix -name chromium -type f 2>/dev/null | head -1",
+  )
+    .toString()
+    .trim();
+  console.log("Chromium encontrado en:", path);
+} catch (e) {
+  console.log("No se encontró chromium:", e.message);
+}
+
 client.initialize();
 
 // ─── FUNCIÓN DE ENVÍO ─────────────────────────────────────────────────────────
