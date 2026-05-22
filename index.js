@@ -145,8 +145,8 @@ const enviarMensajes = async () => {
   console.log("Envío completado");
 };
 
-// ─── CRON (día 1 a las 10:00) ────────────────────────────────────────────────
-cron.schedule("0 10 1 * *", () => {
+// ─── CRON (día 10 a las 10:00) ────────────────────────────────────────────────
+cron.schedule("0 10 10 * *", () => {
   console.log("Cron disparado");
   enviarMensajes();
 });
